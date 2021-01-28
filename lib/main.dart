@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:soil_masture_app/ui/views/home_view.dart';
+import 'package:soil_masture_app/ui/views/login_view.dart';
 
 void main() {
   runApp(MyApp());
@@ -27,7 +28,7 @@ class MyApp extends StatelessWidget {
         // closer together (more dense) than on mobile platforms.
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
-      home: HomeView(),
+      home: loginScreen(),
     );
   }
 }

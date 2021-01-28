@@ -3,8 +3,15 @@ import 'dart:async';
 import 'package:dart_amqp/dart_amqp.dart';
 import 'package:flutter/material.dart';
 import 'package:soil_masture_app/services/rmq_service.dart';
+import 'package:soil_masture_app/ui/model/value_model.dart';
+import 'package:soil_masture_app/ui/widget/card_view.dart';
 
 class HomeView extends StatefulWidget {
+  String user;
+  String pass;
+  String vhost;
+
+  HomeView({this.user, this.pass, this.vhost});
   @override
   _HomeViewState createState() => _HomeViewState();
 }
@@ -12,23 +19,36 @@ class HomeView extends StatefulWidget {
 class _HomeViewState extends State<HomeView> {
   RMQService _rmqService = new RMQService();
   String payload = "";
+  Client client;
   String soil_serial = "";
   String soil_value = "";
   String soil_status = "";
-
+  bool check_status = false;
   String pompa_serial = "";
   String pompa_value = "";
-  final String userQueue = "testdummy";
-  final String passQueue = "testdummy123";
-  final String VhostQueue = "/testdummy";
-  final String hostQueue = "rmq2.pptik.id";
+
+  List<ValueModel> device = [];
+  void connect() {
+    try {
+      ConnectionSettings settings = new ConnectionSettings(
+        host: 'rmq2.pptik.id',
+        authProvider: new PlainAuthenticator(widget.user, widget.pass),
+        virtualHost: widget.vhost,
+      );
+      client = new Client(settings: settings);
+      client.connect().then((value) {
+        setState(() {
+          check_status = true;
+          data();
+          data_pompa();
+        });
+      });
+    } catch (e) {
+      print("kesalahan 344or $e");
+    }
+  }
+
   void data() {
-    ConnectionSettings settings = new ConnectionSettings(
-      host: hostQueue,
-      authProvider: new PlainAuthenticator(userQueue, passQueue),
-      virtualHost: VhostQueue,
-    );
-    Client client = new Client(settings: settings);
     client
         .channel()
         .then((Channel channel) => channel.queue("Log", durable: true))
@@ -43,15 +63,9 @@ class _HomeViewState extends State<HomeView> {
   }
 
   void data_pompa() {
-    ConnectionSettings settings = new ConnectionSettings(
-      host: hostQueue,
-      authProvider: new PlainAuthenticator(userQueue, passQueue),
-      virtualHost: VhostQueue,
-    );
-    Client client = new Client(settings: settings);
     client
         .channel()
-        .then((Channel channel) => channel.queue("Sensor", durable: true))
+        .then((Channel channel) => channel.queue("Aktuator", durable: true))
         .then((Queue queue) => queue.consume())
         .then((Consumer consumer) => consumer.listen((AmqpMessage message) {
               print("test ${message.payloadAsString}");
@@ -69,6 +83,8 @@ class _HomeViewState extends State<HomeView> {
       } else if (cek_value == 0) {
         pompa_value = 'OFF';
       }
+      device.add(
+          ValueModel(pompa_serial, "POMPA", cek_value.toString(), pompa_value));
     });
   }
 
@@ -85,14 +101,16 @@ class _HomeViewState extends State<HomeView> {
       } else if (cek >= 350 && cek <= 700) {
         soil_status = 'Normal';
       }
+      device.add(ValueModel(soil_serial, "SOIL", soil_value, soil_status));
     });
   }
 
   @override
   void initState() {
     // TODO: implement initState
-    data();
-    data_pompa();
+    // data();
+    // data_pompa();
+    connect();
   }
 
   @override
@@ -100,100 +118,22 @@ class _HomeViewState extends State<HomeView> {
     return Scaffold(
         body: SafeArea(
             child: Padding(
-      padding: EdgeInsets.all(10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            "Soil Moisture",
-            style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontFamily: 'MuliFont',
-                fontSize: 30),
-          ),
-          SizedBox(
-            height: 15,
-          ),
-          Text(
-            "Serial Device",
-            style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontFamily: 'MuliFont',
-                fontSize: 20),
-          ),
-          Text(
-            "$soil_serial",
-            style: TextStyle(fontFamily: 'MuliFont', fontSize: 18),
-          ),
-          SizedBox(
-            height: 15,
-          ),
-          Text(
-            "Value",
-            style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontFamily: 'MuliFont',
-                fontSize: 20),
-          ),
-          Text(
-            "$soil_value",
-            style: TextStyle(fontFamily: 'MuliFont', fontSize: 18),
-          ),
-          SizedBox(
-            height: 15,
-          ),
-          Text(
-            "Status",
-            style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontFamily: 'MuliFont',
-                fontSize: 20),
-          ),
-          Text(
-            "$soil_status",
-            style: TextStyle(fontFamily: 'MuliFont', fontSize: 18),
-          ),
-          SizedBox(
-            height: 40,
-          ),
-          Text(
-            "Pompa",
-            style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontFamily: 'MuliFont',
-                fontSize: 30),
-          ),
-          SizedBox(
-            height: 15,
-          ),
-          Text(
-            "Serial Device",
-            style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontFamily: 'MuliFont',
-                fontSize: 20),
-          ),
-          Text(
-            "$pompa_serial",
-            style: TextStyle(fontFamily: 'MuliFont', fontSize: 18),
-          ),
-          SizedBox(
-            height: 15,
-          ),
-          Text(
-            "Status",
-            style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontFamily: 'MuliFont',
-                fontSize: 20),
-          ),
-          Text(
-            "$pompa_value",
-            style: TextStyle(fontFamily: 'MuliFont', fontSize: 18),
-          ),
-        ],
-      ),
-    )));
+                padding: EdgeInsets.all(10),
+                child: check_status?ListView.builder(
+                  reverse: true,
+                  itemCount: device.length,
+                  itemBuilder: (context,idx){
+
+                    return ContentCardView(device: device[idx],);
+                  },
+                ):Container(
+                  child: Center(
+                    child: Text("RMQ Not Connected \n Please check your credential"),
+                  ),
+                )
+            )
+        )
+    );
     // TODO: implement build
     throw UnimplementedError();
   }
